@@ -5,9 +5,9 @@
   "description": "A line focus addon for Zotero",
   "config": {
     "addonName": "A line focus addon for Zotero",
-    "addonID": "ryuwhale95@gmail.com",
+    "addonID": "line-focus@junyeol.dev",
     "addonRef": "line_focus",
-    "addonInstance": "",
+    "addonInstance": "__addonInstance__",
     "prefsPrefix": "extensions.zotero.${addonRef}"
   },
   "repository": {

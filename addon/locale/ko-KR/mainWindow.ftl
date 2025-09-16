@@ -1,0 +1,11 @@
+item-section-example1-head-text =
+    .label = 플러그인 템플릿: 아이템 정보
+item-section-example1-sidenav-tooltip =
+    .tooltiptext = 플러그인 템플릿 섹션 (아이템 정보)
+item-section-example2-head-text =
+    .label = 플러그인 템플릿: 리더 [{$status}]
+item-section-example2-sidenav-tooltip =
+    .tooltiptext = 플러그인 템플릿 섹션 (리더)
+item-section-example2-button-tooltip =
+    .tooltiptext = 이 섹션 등록 해제
+item-info-row-example-label = 예제 행
