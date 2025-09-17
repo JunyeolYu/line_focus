@@ -1,6 +1,6 @@
 import {
   BasicExampleFactory,
-  HelperExampleFactory,
+  // HelperExampleFactory,
   KeyExampleFactory,
   PromptExampleFactory,
   UIExampleFactory,
@@ -159,27 +159,27 @@ function onShortcuts(type: string) {
   }
 }
 
-function onDialogEvents(type: string) {
-  switch (type) {
-    case "dialogExample":
-      HelperExampleFactory.dialogExample();
-      break;
-    case "clipboardExample":
-      HelperExampleFactory.clipboardExample();
-      break;
-    case "filePickerExample":
-      HelperExampleFactory.filePickerExample();
-      break;
-    case "progressWindowExample":
-      HelperExampleFactory.progressWindowExample();
-      break;
-    case "vtableExample":
-      HelperExampleFactory.vtableExample();
-      break;
-    default:
-      break;
-  }
-}
+// function onDialogEvents(type: string) {
+//   switch (type) {
+//     case "dialogExample":
+//       HelperExampleFactory.dialogExample();
+//       break;
+//     case "clipboardExample":
+//       HelperExampleFactory.clipboardExample();
+//       break;
+//     case "filePickerExample":
+//       HelperExampleFactory.filePickerExample();
+//       break;
+//     case "progressWindowExample":
+//       HelperExampleFactory.progressWindowExample();
+//       break;
+//     case "vtableExample":
+//       HelperExampleFactory.vtableExample();
+//       break;
+//     default:
+//       break;
+//   }
+// }
 
 // Add your hooks here. For element click, etc.
 // Keep in mind hooks only do dispatch. Don't add code that does real jobs in hooks.
@@ -193,5 +193,5 @@ export default {
   onNotify,
   onPrefsEvent,
   onShortcuts,
-  onDialogEvents,
+  // onDialogEvents,
 };
