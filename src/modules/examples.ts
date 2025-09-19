@@ -72,7 +72,7 @@ export class BasicExampleFactory {
     Zotero.PreferencePanes.register({
       pluginID: addon.data.config.addonID,
       src: rootURI + "content/preferences.xhtml",
-      label: getString("prefs-title"),
+      label: "Line Focus",
       image: `chrome://${addon.data.config.addonRef}/content/icons/favicon.png`,
     });
   }

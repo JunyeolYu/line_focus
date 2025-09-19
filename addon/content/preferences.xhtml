@@ -1,30 +1,43 @@
 <linkset>
   <html:link rel="localization" href="__addonRef__-preferences.ftl" />
+  <html:style>
+    .color-box {
+      width: 32px;
+      height: 32px;
+      border: 3px solid transparent;
+      margin: 5px;
+      cursor: pointer;
+    }
+    .color-box.selected {
+      border-color: Highlight;
+    }
+    .pref-hr {
+      border: none;
+      height: 1px;
+      background-color: var(--toolbar-background, #ccc);
+      margin: 6px 0 10px 0;
+    }
+  </html:style>
 </linkset>
 <groupbox
   onload="Zotero.__addonInstance__.hooks.onPrefsEvent('load', { window });"
 >
-  <label><html:h2 data-l10n-id="pref-title"></html:h2></label>
-  <checkbox
-    id="zotero-prefpane-__addonRef__-enable"
-    preference="enable"
-    data-l10n-id="pref-enable"
+  <label><html:h1 data-l10n-id="pref-title"></html:h1></label>
+  <label
+      control="zotero-prefpane-__addonRef__-color-container"
+      data-l10n-id="pref-color"
   />
-  <hbox>
-    <html:label
-      for="zotero-prefpane-__addonRef__-input"
-      data-l10n-id="pref-input"
-    ></html:label>
-    <html:input
-      type="text"
-      id="zotero-prefpane-__addonRef__-input"
-      preference="input"
-    ></html:input>
-  </hbox>
-  <hbox class="virtualized-table-container" flex="1" height="300px">
-    <html:div id="__addonRef__-table-container" />
+  <hbox align="center">
+    <hbox id="zotero-prefpane-__addonRef__-color-container">
+      <div class="color-box" data-color="rgba(255, 255, 0, 0.4)" style="background-color: rgba(255, 255, 0, 0.4);"></div>
+      <div class="color-box" data-color="rgba(144, 238, 144, 0.4)" style="background-color: rgba(144, 238, 144, 0.4);"></div>
+      <div class="color-box" data-color="rgba(173, 216, 230, 0.4)" style="background-color: rgba(173, 216, 230, 0.4);"></div>
+      <div class="color-box" data-color="rgba(255, 182, 193, 0.4)" style="background-color: rgba(255, 182, 193, 0.4);"></div>
+      <div class="color-box" data-color="rgba(221, 160, 221, 0.4)" style="background-color: rgba(221, 160, 221, 0.4);"></div>
+    </hbox>
   </hbox>
 </groupbox>
+<html:hr class="pref-hr" />
 <vbox>
   <html:label
     data-l10n-id="pref-help"

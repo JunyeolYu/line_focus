@@ -1,3 +1,8 @@
+import { config } from "../../package.json";
+
+const PREF_KEY = `extensions.${config.addonRef}.rulerColor`;
+const DEFAULT_COLOR = 'rgba(255, 255, 0, 0.4)';
+
 export { initLineFocus };
 
 function initLineFocus() {
@@ -35,8 +40,10 @@ function initLineFocus() {
               rulerElement = pdfDoc.createElement("div");
               rulerElement.id = "reading-ruler";
               
+              const savedColor = Zotero.Prefs.get(PREF_KEY, true) || DEFAULT_COLOR;
+
               rulerElement.style.position = 'absolute';
-              rulerElement.style.backgroundColor = 'rgba(255, 0, 0, 0.4)';
+              rulerElement.style.backgroundColor = savedColor;
               rulerElement.style.pointerEvents = 'none';
               rulerElement.style.zIndex = '9999';
               rulerElement.style.display = 'none';
