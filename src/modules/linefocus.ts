@@ -5,8 +5,8 @@ function initLineFocus() {
     const { reader, doc, append } = event;
 
     let rulerElement: HTMLDivElement | null = null;
-    let viewerContainer: HTMLDivElement | null = null;
-    let mouseMoveHandler: ((event: MouseEvent) => void) | null = null;
+    let mouseOverHandler: ((event: MouseEvent) => void) | null = null;
+    let mouseOutHandler: ((event: MouseEvent) => void) | null = null;
     let isOn = false;
 
     const button = ztoolkit.UI.createElement(doc, "button", {
@@ -23,57 +23,94 @@ function initLineFocus() {
 
             const hostDoc = reader._iframe?.contentDocument;
             if (!hostDoc) { return; }
-
             const viewerIframe = hostDoc.querySelector<HTMLIFrameElement>('#primary-view > iframe');
             if (!viewerIframe) { return; }
-
             const pdfDoc = viewerIframe.contentDocument;
             if (!pdfDoc) { return; }
+            
+            const viewerContainer = pdfDoc.querySelector<HTMLDivElement>('#viewer');
+            if (!viewerContainer) { return; }
 
             if (isOn) {
-              viewerContainer = pdfDoc.querySelector<HTMLDivElement>('#viewer');
-              if (!viewerContainer) { return; }
-
               rulerElement = pdfDoc.createElement("div");
               rulerElement.id = "reading-ruler";
               
-              // --- STYLE INJECTION START ---
-              // Apply styles directly to the element
               rulerElement.style.position = 'absolute';
-              rulerElement.style.left = '0';
-              rulerElement.style.width = '100%';
-              rulerElement.style.height = '25px';
-              rulerElement.style.backgroundColor = 'rgba(255, 0, 0, 0.5)'; // Red color
+              rulerElement.style.backgroundColor = 'rgba(255, 0, 0, 0.4)';
               rulerElement.style.pointerEvents = 'none';
-              rulerElement.style.zIndex = '999';
-              // --- STYLE INJECTION END ---
+              rulerElement.style.zIndex = '9999';
+              rulerElement.style.display = 'none';
+              rulerElement.style.borderRadius = '2px';
 
               if (pdfDoc.defaultView && pdfDoc.defaultView.getComputedStyle(viewerContainer).position === 'static') {
                 viewerContainer.style.position = 'relative';
               }
-              
               viewerContainer.appendChild(rulerElement);
 
-              mouseMoveHandler = (moveEvent: MouseEvent) => {
-                if (rulerElement && viewerContainer) {
-                  const containerRect = viewerContainer.getBoundingClientRect();
-                  const y = moveEvent.clientY - containerRect.top;
-                  const rulerHeight = rulerElement.offsetHeight;
-                  rulerElement.style.top = `${y - rulerHeight / 2}px`;
+              mouseOverHandler = (moveEvent: MouseEvent) => {
+                const target = moveEvent.target as HTMLElement;
+                if (rulerElement && target.nodeName === 'SPAN' && target.closest('.textLayer')) {
+                  const lineSpans: HTMLElement[] = [target];
+                  const targetRect = target.getBoundingClientRect();
+                  const targetTop = targetRect.top;
+                  const tolerance = targetRect.height / 2; // Allow for small vertical misalignments
+
+                  // Traverse backwards
+                  let currentSpan = target.previousElementSibling as HTMLElement;
+                  while (currentSpan && currentSpan.nodeName === 'SPAN') {
+                    const rect = currentSpan.getBoundingClientRect();
+                    if (Math.abs(rect.top - targetTop) < tolerance) {
+                      lineSpans.unshift(currentSpan);
+                    } else {
+                      break;
+                    }
+                    currentSpan = currentSpan.previousElementSibling as HTMLElement;
+                  }
+
+                  // Traverse forwards
+                  currentSpan = target.nextElementSibling as HTMLElement;
+                  while (currentSpan && currentSpan.nodeName === 'SPAN') {
+                    const rect = currentSpan.getBoundingClientRect();
+                    if (Math.abs(rect.top - targetTop) < tolerance) {
+                      lineSpans.push(currentSpan);
+                    } else {
+                      break;
+                    }
+                    currentSpan = currentSpan.nextElementSibling as HTMLElement;
+                  }
+
+                  // Calculate the bounding box of the entire line
+                  const firstSpanRect = lineSpans[0].getBoundingClientRect();
+                  const lastSpanRect = lineSpans[lineSpans.length - 1].getBoundingClientRect();
+                  const viewerRect = viewerContainer.getBoundingClientRect();
+
+                  const left = firstSpanRect.left - viewerRect.left;
+                  const top = firstSpanRect.top - viewerRect.top;
+                  const width = lastSpanRect.right - firstSpanRect.left;
+                  const height = firstSpanRect.height;
+
+                  rulerElement.style.left = `${left}px`;
+                  rulerElement.style.top = `${top}px`;
+                  rulerElement.style.width = `${width}px`;
+                  rulerElement.style.height = `${height}px`;
+                  rulerElement.style.display = 'block';
                 }
               };
-              viewerContainer.addEventListener("mousemove", mouseMoveHandler);
+
+              mouseOutHandler = () => {
+                if (rulerElement) {
+                  rulerElement.style.display = 'none';
+                }
+              };
+
+              viewerContainer.addEventListener("mouseover", mouseOverHandler);
+              viewerContainer.addEventListener("mouseout", mouseOutHandler);
             } else {
-              const container = pdfDoc.querySelector<HTMLDivElement>('#viewer');
-              if (container && mouseMoveHandler) {
-                container.removeEventListener("mousemove", mouseMoveHandler);
-                mouseMoveHandler = null;
-              }
-              const ruler = container?.querySelector<HTMLDivElement>('#reading-ruler');
-              if (ruler) {
-                ruler.remove();
-                rulerElement = null;
-              }
+              // Cleanup
+              if (viewerContainer && mouseOverHandler) viewerContainer.removeEventListener("mouseover", mouseOverHandler);
+              if (viewerContainer && mouseOutHandler) viewerContainer.removeEventListener("mouseout", mouseOutHandler);
+              const ruler = viewerContainer.querySelector<HTMLDivElement>('#reading-ruler');
+              if (ruler) ruler.remove();
             }
           },
         },
