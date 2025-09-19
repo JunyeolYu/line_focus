@@ -4,7 +4,6 @@ menuitem-label = 애드온 템플릿: 도우미 예제
 menupopup-label = 애드온 템플릿: 메뉴팝업
 menuitem-submenulabel = 애드온 템플릿
 menuitem-filemenulabel = 애드온 템플릿: 파일 메뉴아이템
-prefs-title = 템플릿
 prefs-table-title = 제목
 prefs-table-detail = 세부사항
 tabpanel-lib-tab-label = 라이브러리 탭

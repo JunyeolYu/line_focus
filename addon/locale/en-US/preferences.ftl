@@ -1,5 +1,3 @@
-pref-title = Addon Template Example
-pref-enable =
-    .label = Enable
-pref-input = Input
+pref-title = Appearance
+pref-color = Color
 pref-help = { $name } Build { $version } { $time }

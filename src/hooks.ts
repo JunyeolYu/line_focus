@@ -1,6 +1,6 @@
 import {
   BasicExampleFactory,
-  HelperExampleFactory,
+  // HelperExampleFactory,
   KeyExampleFactory,
   PromptExampleFactory,
   UIExampleFactory,
@@ -8,6 +8,7 @@ import {
 import { getString, initLocale } from "./utils/locale";
 import { registerPrefsScripts } from "./modules/preferenceScript";
 import { createZToolkit } from "./utils/ztoolkit";
+import { initLineFocus } from "./modules/linefocus";
 
 async function onStartup() {
   await Promise.all([
@@ -17,6 +18,8 @@ async function onStartup() {
   ]);
 
   initLocale();
+
+  initLineFocus();
 
   BasicExampleFactory.registerPrefs();
 
@@ -162,19 +165,26 @@ function onShortcuts(type: string) {
 function onDialogEvents(type: string) {
   switch (type) {
     case "dialogExample":
-      HelperExampleFactory.dialogExample();
+      // Placeholder for dialog example
       break;
     case "clipboardExample":
-      HelperExampleFactory.clipboardExample();
+      // Placeholder for clipboard example
       break;
     case "filePickerExample":
-      HelperExampleFactory.filePickerExample();
+      // Placeholder for file picker example
       break;
     case "progressWindowExample":
-      HelperExampleFactory.progressWindowExample();
+      // Placeholder for progress window example
       break;
     case "vtableExample":
-      HelperExampleFactory.vtableExample();
+      // Placeholder for vtable example
+      break;
+    case "lineFocusDialog":
+      // For testing
+      ztoolkit.getGlobal("alert")(
+        "This is a placeholder for line focus dialog. You can implement your own dialog here.",
+      );
+      ztoolkit.log("Line Focus dialog opened");
       break;
     default:
       break;
