@@ -28,31 +28,42 @@ function initLineFocus() {
 
             const hostDoc = reader._iframe?.contentDocument;
             if (!hostDoc) { return; }
-            const viewerIframe = hostDoc.querySelector<HTMLIFrameElement>('#primary-view > iframe');
+            const viewerIframe = hostDoc.querySelector('#primary-view > iframe') as HTMLIFrameElement | null;
             if (!viewerIframe) { return; }
-            const pdfDoc = viewerIframe.contentDocument;
+            const pdfDoc = viewerIframe.contentDocument as Document | null;
             if (!pdfDoc) { return; }
             
-            const viewerContainer = pdfDoc.querySelector<HTMLDivElement>('#viewer');
+            const viewerContainer = pdfDoc.querySelector('#viewer') as HTMLDivElement | null;
             if (!viewerContainer) { return; }
 
             if (isOn) {
-              rulerElement = pdfDoc.createElement("div");
-              rulerElement.id = "reading-ruler";
-              
-              const savedColor = Zotero.Prefs.get(PREF_KEY, true) || DEFAULT_COLOR;
+              const newRuler = pdfDoc.createElement("div");
+              newRuler.id = "reading-ruler";
 
-              rulerElement.style.position = 'absolute';
-              rulerElement.style.backgroundColor = savedColor;
-              rulerElement.style.pointerEvents = 'none';
-              rulerElement.style.zIndex = '9999';
-              rulerElement.style.display = 'none';
-              rulerElement.style.borderRadius = '2px';
+              const savedColor = String(Zotero.Prefs.get(PREF_KEY, true) || DEFAULT_COLOR);
 
-              if (pdfDoc.defaultView && pdfDoc.defaultView.getComputedStyle(viewerContainer).position === 'static') {
-                viewerContainer.style.position = 'relative';
+              newRuler.style.position = 'absolute';
+              newRuler.style.backgroundColor = savedColor;
+              newRuler.style.pointerEvents = 'none';
+              newRuler.style.zIndex = '9999';
+              newRuler.style.display = 'none';
+              newRuler.style.borderRadius = '2px';
+
+              if (pdfDoc.defaultView) {
+                const win = pdfDoc.defaultView as Window;
+                const vc = viewerContainer;
+                if (vc) {
+                  const styleDecl = win.getComputedStyle(vc as Element);
+                  if (styleDecl) {
+                    const viewerPos = styleDecl.position;
+                    if (viewerPos === 'static') {
+                      (vc as HTMLDivElement).style.position = 'relative';
+                    }
+                  }
+                }
               }
-              viewerContainer.appendChild(rulerElement);
+                viewerContainer.appendChild(newRuler);
+                rulerElement = newRuler;
 
               mouseOverHandler = (moveEvent: MouseEvent) => {
                 const target = moveEvent.target as HTMLElement;
@@ -116,7 +127,7 @@ function initLineFocus() {
               // Cleanup
               if (viewerContainer && mouseOverHandler) viewerContainer.removeEventListener("mouseover", mouseOverHandler);
               if (viewerContainer && mouseOutHandler) viewerContainer.removeEventListener("mouseout", mouseOutHandler);
-              const ruler = viewerContainer.querySelector<HTMLDivElement>('#reading-ruler');
+              const ruler = viewerContainer.querySelector('#reading-ruler') as HTMLDivElement | null;
               if (ruler) ruler.remove();
             }
           },
