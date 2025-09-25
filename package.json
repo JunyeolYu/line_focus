@@ -1,7 +1,7 @@
 {
   "name": "zotero-plugin-template",
   "type": "module",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "A line focus addon for Zotero",
   "config": {
     "addonName": "A line focus addon for Zotero",
