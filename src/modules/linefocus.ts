@@ -20,6 +20,31 @@ const pressedKeys = new Set<string>();
 let lastMoveAt = 0; // timestamp of last line move
 const MOVE_INTERVAL_MIN = 10; // minimal ms gap to avoid accidental double fire (keeps repeat fast)
 
+function getScrollContainer(): HTMLElement | null {
+  if (!activeViewerContainer) return null;
+  // In pdf.js, #viewerContainer is the scrollable parent of #viewer
+  let p: HTMLElement | null = activeViewerContainer.parentElement as HTMLElement | null;
+  while (p) {
+    const canScroll = p.scrollHeight > p.clientHeight + 10; // some tolerance
+    if (canScroll) return p;
+    p = p.parentElement as HTMLElement | null;
+  }
+  return null;
+}
+
+function rebuildCachePreserveCurrent() {
+  if (!activeViewerContainer) return;
+  const ref = (currentLineIndex >= 0 && currentLineIndex < cachedLines.length) ? cachedLines[currentLineIndex][0] : null;
+  const prevLen = cachedLines.length;
+  buildLinesCache(activeViewerContainer);
+  if (ref) {
+    const idx = cachedLines.findIndex(line => line.includes(ref));
+    if (idx >= 0) currentLineIndex = idx; // restore index if found
+    else currentLineIndex = Math.min(currentLineIndex, cachedLines.length - 1);
+  }
+  return prevLen !== cachedLines.length;
+}
+
 function resetState() {
   activeViewerContainer = null;
   rulerElementGlobal = null;
@@ -126,14 +151,60 @@ function installKeyboardHookOnce() {
       if (!activeViewerContainer) return;
       if (!cachedLines.length) buildLinesCache(activeViewerContainer);
       if (!cachedLines.length) return;
-      if (currentLineIndex === -1) {
-        currentLineIndex = 0;
-      } else {
-        currentLineIndex += isS ? 1 : -1;
-        if (currentLineIndex < 0) currentLineIndex = 0; // top clamp
-        if (currentLineIndex >= cachedLines.length) currentLineIndex = cachedLines.length - 1; // bottom clamp
+      if (currentLineIndex === -1) currentLineIndex = 0;
+      else {
+        if (isS) {
+          let targetIndex = currentLineIndex + 1;
+          if (targetIndex >= cachedLines.length) {
+            // Try rebuild (maybe new page rendered)
+            const changed = rebuildCachePreserveCurrent();
+            if (changed) {
+              targetIndex = currentLineIndex + 1;
+            }
+            if (targetIndex >= cachedLines.length) {
+              // Force scroll to load next page, then attempt another rebuild async
+              const sc = getScrollContainer();
+              if (sc) {
+                try { sc.scrollBy({ top: sc.clientHeight * 0.8, behavior: 'instant' as ScrollBehavior }); } catch { }
+                // schedule async rebuild & move
+                setTimeout(() => {
+                  rebuildCachePreserveCurrent();
+                  const newIdx = currentLineIndex + 1;
+                  if (newIdx < cachedLines.length) {
+                    currentLineIndex = newIdx;
+                    highlightLineByIndex(currentLineIndex);
+                  }
+                }, 50);
+              }
+              // Keep highlighting current line until next batch ready
+              highlightLineByIndex(currentLineIndex);
+              return;
+            }
+          }
+          if (targetIndex < cachedLines.length) currentLineIndex = targetIndex;
+        } else { // isW
+          let targetIndex = currentLineIndex - 1;
+          if (targetIndex < 0) {
+            // Try scroll up to load previous page
+            const sc = getScrollContainer();
+            if (sc) {
+              try { sc.scrollBy({ top: -sc.clientHeight * 0.8, behavior: 'instant' as ScrollBehavior }); } catch { }
+              setTimeout(() => {
+                rebuildCachePreserveCurrent();
+                const newIdx = currentLineIndex - 1;
+                if (newIdx >= 0) {
+                  currentLineIndex = newIdx;
+                  highlightLineByIndex(currentLineIndex);
+                }
+              }, 50);
+            }
+            highlightLineByIndex(currentLineIndex);
+            return;
+          }
+          currentLineIndex = targetIndex;
+        }
       }
-      highlightLineByIndex(currentLineIndex);
+      if (currentLineIndex >= 0) highlightLineByIndex(currentLineIndex);
     }
   });
 }
