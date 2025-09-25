@@ -32,7 +32,7 @@ function initLineFocus() {
             if (!viewerIframe) { return; }
             const pdfDoc = viewerIframe.contentDocument as Document | null;
             if (!pdfDoc) { return; }
-            
+
             const viewerContainer = pdfDoc.querySelector('#viewer') as HTMLDivElement | null;
             if (!viewerContainer) { return; }
 
@@ -62,8 +62,8 @@ function initLineFocus() {
                   }
                 }
               }
-                viewerContainer.appendChild(newRuler);
-                rulerElement = newRuler;
+              viewerContainer.appendChild(newRuler);
+              rulerElement = newRuler;
 
               mouseOverHandler = (moveEvent: MouseEvent) => {
                 const target = moveEvent.target as HTMLElement;
