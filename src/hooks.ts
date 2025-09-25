@@ -76,6 +76,21 @@ async function onNotify(
   }
 }
 
+/**
+ * Preference window events dispatcher.
+ * Currently only handles 'load' to wire up custom preference scripts
+ * (e.g. color selection UI).
+ */
+async function onPrefsEvent(event: string, ctx: { window: Window }) {
+  try {
+    if (event === "load") {
+      await registerPrefsScripts(ctx.window);
+    }
+  } catch (e) {
+    ztoolkit.log("prefs event error", event, e);
+  }
+}
+
 // Add your hooks here. For element click, etc.
 // Keep in mind hooks only do dispatch. Don't add code that does real jobs in hooks.
 // Otherwise the code would be hard to read and maintain.
@@ -86,7 +101,7 @@ export default {
   onMainWindowLoad,
   onMainWindowUnload,
   onNotify,
-  // onPrefsEvent,
+  onPrefsEvent,
   // onShortcuts,
   // onDialogEvents,
 };
