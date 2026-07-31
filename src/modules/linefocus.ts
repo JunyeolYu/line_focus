@@ -1,4 +1,9 @@
 import { config } from "../../package.json";
+import {
+  createMarginTextHistory,
+  filterMarginTextLines,
+  groupTextSpansByLine,
+} from "./textLineGrouping";
 
 const PREF_KEY = `extensions.${config.addonRef}.rulerColor`;
 const DEFAULT_COLOR = 'rgba(255, 255, 0, 0.4)';
@@ -13,6 +18,7 @@ let rulerElementGlobal: HTMLDivElement | null = null;
 let currentLineIndex: number = -1; // index into cachedLines
 let cachedLines: HTMLElement[][] = []; // each line is array of span elements
 let clickHandler: ((e: MouseEvent) => void) | null = null;
+let marginTextHistory = createMarginTextHistory();
 
 function getScrollContainer(): HTMLElement | null {
   if (!activeViewerContainer) return null;
@@ -28,13 +34,14 @@ function getScrollContainer(): HTMLElement | null {
 
 function rebuildCachePreserveCurrent() {
   if (!activeViewerContainer) return;
+  const previousIndex = currentLineIndex;
   const ref = (currentLineIndex >= 0 && currentLineIndex < cachedLines.length) ? cachedLines[currentLineIndex][0] : null;
   const prevLen = cachedLines.length;
   buildLinesCache(activeViewerContainer);
   if (ref) {
     const idx = cachedLines.findIndex(line => line.includes(ref));
     if (idx >= 0) currentLineIndex = idx; // restore index if found
-    else currentLineIndex = Math.min(currentLineIndex, cachedLines.length - 1);
+    else currentLineIndex = Math.min(previousIndex, cachedLines.length - 1);
   }
   return prevLen !== cachedLines.length;
 }
@@ -45,6 +52,7 @@ function resetState() {
   currentLineIndex = -1;
   cachedLines = [];
   clickHandler = null;
+  marginTextHistory = createMarginTextHistory();
 }
 
 type LineFocusDirection = "up" | "down";
@@ -164,28 +172,57 @@ function shutdownLineFocus(): void {
 function buildLinesCache(container: HTMLElement): void {
   cachedLines = [];
   currentLineIndex = -1;
-  const spans = Array.from(container.querySelectorAll('.textLayer span')) as HTMLElement[];
-  if (!spans.length) return;
-  // Group by top within tolerance
-  const tolerance = 1; // px tolerance for same line
-  let currentLine: HTMLElement[] = [];
-  let currentTop: number | null = null;
-  for (const span of spans) {
-    const rect = span.getBoundingClientRect();
-    if (currentTop === null) {
-      currentTop = rect.top;
-      currentLine.push(span);
-      continue;
+  const textLayers = Array.from(
+    container.querySelectorAll(".textLayer"),
+  ) as HTMLElement[];
+  const spanRects = new Map<HTMLElement, DOMRect>();
+  const spanTexts = new Map<HTMLElement, string>();
+  const spanAngles = new Map<HTMLElement, number>();
+  const getRect = (span: HTMLElement) =>
+    spanRects.get(span) ?? span.getBoundingClientRect();
+  const pages = textLayers.map((textLayer, index) => {
+    const pageElement = textLayer.closest(".page") as HTMLElement | null;
+    const pageNumberText = pageElement?.dataset.pageNumber;
+    const pageNumber = Number(pageNumberText);
+    const spans = (
+      Array.from(textLayer.querySelectorAll("span")) as HTMLElement[]
+    ).filter((span) => span.textContent?.trim());
+    for (const span of spans) {
+      spanRects.set(span, span.getBoundingClientRect());
+      spanTexts.set(span, span.textContent ?? "");
+      spanAngles.set(span, getSpanRotation(span));
     }
-    if (Math.abs(rect.top - currentTop) <= tolerance) {
-      currentLine.push(span);
-    } else {
-      cachedLines.push(currentLine);
-      currentLine = [span];
-      currentTop = rect.top;
-    }
+    return {
+      key: pageNumberText || pageElement?.id || String(index),
+      pageNumber: Number.isFinite(pageNumber) ? pageNumber : undefined,
+      rect: textLayer.getBoundingClientRect(),
+      lines: groupTextSpansByLine(spans, getRect),
+    };
+  });
+
+  cachedLines = filterMarginTextLines(
+    pages,
+    marginTextHistory,
+    getRect,
+    (span) => spanTexts.get(span) ?? "",
+    (span) => spanAngles.get(span) ?? 0,
+  );
+}
+
+function getSpanRotation(span: HTMLElement): number {
+  const view = span.ownerDocument?.defaultView;
+  if (!view) return 0;
+  const style = view.getComputedStyle(span);
+  if (!style) return 0;
+  const transform = style.getPropertyValue("transform");
+  if (!transform || transform === "none") return 0;
+  const match = transform.match(/^matrix(?:3d)?\((.+)\)$/);
+  if (!match) return 0;
+  const values = match[1].split(",").map(Number);
+  if (values.length < 2 || values.some((value) => !Number.isFinite(value))) {
+    return 0;
   }
-  if (currentLine.length) cachedLines.push(currentLine);
+  return (Math.atan2(values[1], values[0]) * 180) / Math.PI;
 }
 
 function highlightLineByIndex(index: number) {
@@ -194,16 +231,22 @@ function highlightLineByIndex(index: number) {
   const lineSpans = cachedLines[index];
   if (!lineSpans.length) return;
   const firstRect = lineSpans[0].getBoundingClientRect();
-  const lastRect = lineSpans[lineSpans.length - 1].getBoundingClientRect();
+  let left = firstRect.left;
+  let top = firstRect.top;
+  let right = firstRect.right;
+  let bottom = firstRect.bottom;
+  for (const span of lineSpans.slice(1)) {
+    const rect = span.getBoundingClientRect();
+    left = Math.min(left, rect.left);
+    top = Math.min(top, rect.top);
+    right = Math.max(right, rect.right);
+    bottom = Math.max(bottom, rect.bottom);
+  }
   const viewerRect = activeViewerContainer.getBoundingClientRect();
-  const left = firstRect.left - viewerRect.left;
-  const top = firstRect.top - viewerRect.top;
-  const width = lastRect.right - firstRect.left;
-  const height = firstRect.height;
-  rulerElementGlobal.style.left = `${left}px`;
-  rulerElementGlobal.style.top = `${top}px`;
-  rulerElementGlobal.style.width = `${width}px`;
-  rulerElementGlobal.style.height = `${height}px`;
+  rulerElementGlobal.style.left = `${left - viewerRect.left}px`;
+  rulerElementGlobal.style.top = `${top - viewerRect.top}px`;
+  rulerElementGlobal.style.width = `${right - left}px`;
+  rulerElementGlobal.style.height = `${bottom - top}px`;
   rulerElementGlobal.style.display = 'block';
   // Attempt scroll into view if out of viewport
   lineSpans[0].scrollIntoView({ block: 'nearest' });
@@ -261,6 +304,7 @@ function initLineFocus() {
             if (!viewerContainer) { return; }
 
             if (isOn) {
+              marginTextHistory = createMarginTextHistory();
               const newRuler = pdfDoc.createElement("div");
               newRuler.id = "reading-ruler";
 
