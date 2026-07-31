@@ -1,2 +1,2 @@
-pref-title = 插件模板设置示例
+pref-color = 颜色
 pref-help = { $name } Build { $version } { $time }

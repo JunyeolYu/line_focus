@@ -1,0 +1,18 @@
+.color-box {
+  width: 32px;
+  height: 32px;
+  border: 3px solid transparent;
+  margin: 5px;
+  cursor: pointer;
+}
+
+.color-box.selected {
+  border-color: Highlight;
+}
+
+.pref-hr {
+  border: none;
+  height: 1px;
+  background-color: var(--toolbar-background, #ccc);
+  margin: 6px 0 10px;
+}

@@ -6,7 +6,7 @@ Read PDFs line by line in Zotero with a movable highlight.
 
 ## Overview
 
-Adds a reading ruler to Zotero’s PDF reader: highlights the current text line, moves with W/S, and snaps to clicks.
+Adds a reading ruler to Zotero’s PDF reader: highlights the current text line, moves with `[` / `]`, and snaps to clicks.
 
 ## Example
 
@@ -18,7 +18,7 @@ Yellow highlight in the left column marks the focused line.
 
 - Toolbar toggle
 - Precise line highlight (pdf.js textLayer)
-- Keyboard: `w` - up, `s` - down
+- Keyboard: `[` - up, `]` - down
 - Click to move; auto-scroll across pages
 - Configurable color (Preferences)
 
@@ -30,11 +30,13 @@ Yellow highlight in the left column marks the focused line.
 ## Usage
 
 - Open a PDF and toggle Line Focus on the reader toolbar.
-- Press `s` to move down, `w` to move up.
+- Press `]` to move down or `[` to move up.
 - Click any text line to jump the ruler.
+- Choose the ruler color under Settings > Line Focus.
 
 ## Changelog
 
+- v0.2.2: Zotero 9 compatibility and conflict-free `[` / `]` keyboard navigation
 - v0.2.0: Keyboard line highlighting
 - v0.1.0: Initial release (reading ruler, color preference)
 

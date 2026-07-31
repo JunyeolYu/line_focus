@@ -3,10 +3,8 @@ import { config } from "../../package.json";
 const PREF_KEY = `extensions.${config.addonRef}.rulerColor`;
 const DEFAULT_COLOR = 'rgba(255, 255, 0, 0.4)';
 
-export { initLineFocus };
+export { initLineFocus, shutdownLineFocus };
 
-let keyboardHookInstalled = false;
-let missingKeyFieldWarned = false;
 let lineFocusActive = false; // global flag indicating whether line focus is currently ON in the active reader
 
 // State for fixed line highlight
@@ -15,10 +13,6 @@ let rulerElementGlobal: HTMLDivElement | null = null;
 let currentLineIndex: number = -1; // index into cachedLines
 let cachedLines: HTMLElement[][] = []; // each line is array of span elements
 let clickHandler: ((e: MouseEvent) => void) | null = null;
-// Track keys to avoid duplicate processing (some environments may fire multiple handlers)
-const pressedKeys = new Set<string>();
-let lastMoveAt = 0; // timestamp of last line move
-const MOVE_INTERVAL_MIN = 10; // minimal ms gap to avoid accidental double fire (keeps repeat fast)
 
 function getScrollContainer(): HTMLElement | null {
   if (!activeViewerContainer) return null;
@@ -52,161 +46,119 @@ function resetState() {
   cachedLines = [];
   clickHandler = null;
 }
-interface NormalizedKeyEvent {
-  key: string | null;
-  code: string | null;
-  keyCode: number | null;
-  raw: any;
-}
-function normalizeKeyEvent(e: any): NormalizedKeyEvent {
-  let key: string | null = null;
-  let code: string | null = null;
-  let keyCode: number | null = null;
 
-  if (typeof e.key === 'string' && e.key.length > 0) key = e.key;
-  if (typeof e.code === 'string' && e.code.length > 0) code = e.code;
-  if (typeof e.keyCode === 'number' && e.keyCode > 0) keyCode = e.keyCode;
-  else if (typeof e.which === 'number' && e.which > 0) keyCode = e.which;
-  else if (typeof e.charCode === 'number' && e.charCode > 0) keyCode = e.charCode;
+type LineFocusDirection = "up" | "down";
 
-  if (!key && keyCode) {
-    // Attempt derive key from keyCode (A-Z 65-90)
-    if (keyCode >= 65 && keyCode <= 90) key = String.fromCharCode(keyCode).toLowerCase();
-  }
-  if (!code && key) {
-    // Derive code for letters
-    if (/^[a-z]$/i.test(key)) code = 'Key' + key.toUpperCase();
-  }
-  if (!code && keyCode && keyCode >= 65 && keyCode <= 90) {
-    code = 'Key' + String.fromCharCode(keyCode);
+function getLineFocusDirection(
+  event: KeyboardEvent,
+): LineFocusDirection | null {
+  if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+    return null;
   }
 
-  if (!missingKeyFieldWarned && (!('key' in e) || !('code' in e))) {
-    missingKeyFieldWarned = true;
-    try {
-      Zotero.log('[LineFocus] Key event missing standard fields. keys=' + Object.keys(e).join(','));
-    } catch { }
+  if (event.code === "BracketRight") {
+    return "down";
   }
-
-  return { key, code, keyCode, raw: e };
+  if (event.code === "BracketLeft") {
+    return "up";
+  }
+  return null;
 }
 
-function installKeyboardHookOnce() {
-  if (keyboardHookInstalled) return;
-  keyboardHookInstalled = true;
+function isEditableTarget(target: EventTarget | null): boolean {
+  return Boolean(
+    (target as Element | null)?.closest?.(
+      "input, textarea, select, [contenteditable]:not([contenteditable='false'])",
+    ),
+  );
+}
 
-  ztoolkit.Keyboard.register((ev: any, keyOptions: any) => {
-    if (!lineFocusActive) return; // Only process when active
+function moveLineFocus(direction: LineFocusDirection): void {
+  if (!activeViewerContainer) return;
+  if (!cachedLines.length) buildLinesCache(activeViewerContainer);
+  if (!cachedLines.length) return;
 
-    // We only want to act on keydown to avoid double fire (keydown + keyup) while
-    // still allowing native repeat when key is held.
-    const type = ev?.type;
-    if (type === 'keyup') {
-      const nkUp = normalizeKeyEvent(ev);
-      if (nkUp.code) pressedKeys.delete(nkUp.code);
+  if (currentLineIndex === -1) {
+    currentLineIndex = 0;
+  } else if (direction === "down") {
+    let targetIndex = currentLineIndex + 1;
+    if (targetIndex >= cachedLines.length) {
+      const changed = rebuildCachePreserveCurrent();
+      if (changed) {
+        targetIndex = currentLineIndex + 1;
+      }
+      if (targetIndex >= cachedLines.length) {
+        const sc = getScrollContainer();
+        if (sc) {
+          sc.scrollBy({
+            top: sc.clientHeight * 0.8,
+            behavior: "instant" as ScrollBehavior,
+          });
+          setTimeout(() => {
+            rebuildCachePreserveCurrent();
+            const newIdx = currentLineIndex + 1;
+            if (newIdx < cachedLines.length) {
+              currentLineIndex = newIdx;
+              highlightLineByIndex(currentLineIndex);
+            }
+          }, 50);
+        }
+        highlightLineByIndex(currentLineIndex);
+        return;
+      }
+    }
+    currentLineIndex = targetIndex;
+  } else {
+    const targetIndex = currentLineIndex - 1;
+    if (targetIndex < 0) {
+      const sc = getScrollContainer();
+      if (sc) {
+        sc.scrollBy({
+          top: -sc.clientHeight * 0.8,
+          behavior: "instant" as ScrollBehavior,
+        });
+        setTimeout(() => {
+          rebuildCachePreserveCurrent();
+          const newIdx = currentLineIndex - 1;
+          if (newIdx >= 0) {
+            currentLineIndex = newIdx;
+            highlightLineByIndex(currentLineIndex);
+          }
+        }, 50);
+      }
+      highlightLineByIndex(currentLineIndex);
       return;
     }
-    if (type && type !== 'keydown') return; // ignore keypress
+    currentLineIndex = targetIndex;
+  }
 
-    const nk = normalizeKeyEvent(ev);
+  highlightLineByIndex(currentLineIndex);
+}
 
-    // Dump once when derived code is KeyS
-    if (nk.code === 'KeyS') {
+function handleLineFocusKeyEvent(event: KeyboardEvent): void {
+  if (
+    event.type !== "keydown" ||
+    !lineFocusActive ||
+    isEditableTarget(event.target)
+  ) {
+    return;
+  }
 
-      // try {
-      //   Zotero.log('[ztoolkit cb] normalized code=KeyS key=' + nk.key + ' keyCode=' + nk.keyCode);
-      //   Zotero.log('[ztoolkit cb] keyOptions=' + JSON.stringify(keyOptions, (k, v) => (v && typeof v === 'object' && v.toString ? v.toString() : v)));
-      // } catch { }
-    }
+  const direction = getLineFocusDirection(event);
+  if (!direction) return;
 
-    const kObj = keyOptions?.keyboard;
-    const isS = (
-      nk.code === 'KeyS' ||
-      (typeof nk.key === 'string' && nk.key.toLowerCase() === 's') ||
-      nk.keyCode === 83 ||
-      kObj?.code === 'KeyS' ||
-      kObj?.equals?.('s') ||
-      kObj?.equals?.('S')
-    );
-    const isW = (
-      nk.code === 'KeyW' ||
-      (typeof nk.key === 'string' && nk.key.toLowerCase() === 'w') ||
-      nk.keyCode === 87 ||
-      kObj?.code === 'KeyW' ||
-      kObj?.equals?.('w') ||
-      kObj?.equals?.('W')
-    );
+  event.preventDefault();
+  event.stopPropagation();
+  moveLineFocus(direction);
+}
 
-    if (isS || isW) {
-      // Deduplicate: process only if not already pressed OR enough time passed (repeat)
-      const keyId = isS ? 'KeyS' : 'KeyW';
-      const now = Date.now();
-      if (pressedKeys.has(keyId)) {
-        // allow if native repeat interval passes threshold
-        if (now - lastMoveAt < MOVE_INTERVAL_MIN) return;
-      } else {
-        pressedKeys.add(keyId);
-      }
-      lastMoveAt = now;
-      if (!activeViewerContainer) return;
-      if (!cachedLines.length) buildLinesCache(activeViewerContainer);
-      if (!cachedLines.length) return;
-      if (currentLineIndex === -1) currentLineIndex = 0;
-      else {
-        if (isS) {
-          let targetIndex = currentLineIndex + 1;
-          if (targetIndex >= cachedLines.length) {
-            // Try rebuild (maybe new page rendered)
-            const changed = rebuildCachePreserveCurrent();
-            if (changed) {
-              targetIndex = currentLineIndex + 1;
-            }
-            if (targetIndex >= cachedLines.length) {
-              // Force scroll to load next page, then attempt another rebuild async
-              const sc = getScrollContainer();
-              if (sc) {
-                try { sc.scrollBy({ top: sc.clientHeight * 0.8, behavior: 'instant' as ScrollBehavior }); } catch { }
-                // schedule async rebuild & move
-                setTimeout(() => {
-                  rebuildCachePreserveCurrent();
-                  const newIdx = currentLineIndex + 1;
-                  if (newIdx < cachedLines.length) {
-                    currentLineIndex = newIdx;
-                    highlightLineByIndex(currentLineIndex);
-                  }
-                }, 50);
-              }
-              // Keep highlighting current line until next batch ready
-              highlightLineByIndex(currentLineIndex);
-              return;
-            }
-          }
-          if (targetIndex < cachedLines.length) currentLineIndex = targetIndex;
-        } else { // isW
-          let targetIndex = currentLineIndex - 1;
-          if (targetIndex < 0) {
-            // Try scroll up to load previous page
-            const sc = getScrollContainer();
-            if (sc) {
-              try { sc.scrollBy({ top: -sc.clientHeight * 0.8, behavior: 'instant' as ScrollBehavior }); } catch { }
-              setTimeout(() => {
-                rebuildCachePreserveCurrent();
-                const newIdx = currentLineIndex - 1;
-                if (newIdx >= 0) {
-                  currentLineIndex = newIdx;
-                  highlightLineByIndex(currentLineIndex);
-                }
-              }, 50);
-            }
-            highlightLineByIndex(currentLineIndex);
-            return;
-          }
-          currentLineIndex = targetIndex;
-        }
-      }
-      if (currentLineIndex >= 0) highlightLineByIndex(currentLineIndex);
-    }
-  });
+function shutdownLineFocus(): void {
+  lineFocusActive = false;
+  if (activeViewerContainer && clickHandler) {
+    activeViewerContainer.removeEventListener("click", clickHandler, true);
+  }
+  rulerElementGlobal?.remove();
+  resetState();
 }
 
 function buildLinesCache(container: HTMLElement): void {
@@ -254,7 +206,7 @@ function highlightLineByIndex(index: number) {
   rulerElementGlobal.style.height = `${height}px`;
   rulerElementGlobal.style.display = 'block';
   // Attempt scroll into view if out of viewport
-  try { lineSpans[0].scrollIntoView({ block: 'nearest' }); } catch { }
+  lineSpans[0].scrollIntoView({ block: 'nearest' });
 }
 
 function highlightLineFromSpan(span: HTMLElement) {
@@ -277,7 +229,7 @@ function highlightLineFromSpan(span: HTMLElement) {
 }
 
 function initLineFocus() {
-  installKeyboardHookOnce();
+  ztoolkit.Keyboard.register(handleLineFocusKeyEvent);
 
   Zotero.Reader.registerEventListener("renderToolbar", (event) => {
     const { reader, doc, append } = event;
@@ -289,7 +241,7 @@ function initLineFocus() {
       namespace: "html",
       id: "toggle-line-focus",
       classList: ["toolbar-button", `${addon.data.config.addonRef}-reader-button`],
-      properties: { tabIndex: -1, title: "Toggle Line Focus" },
+      properties: { tabIndex: -1, title: "Toggle Line Focus ([ / ])" },
       listeners: [
         {
           type: "click",

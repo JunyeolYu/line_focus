@@ -4,8 +4,9 @@ import {
 } from "./modules/examples";
 import { getString, initLocale } from "./utils/locale";
 import { registerPrefsScripts } from "./modules/preferenceScript";
+import { registerPreferencePane } from "./modules/preferences";
 import { createZToolkit } from "./utils/ztoolkit";
-import { initLineFocus } from "./modules/linefocus";
+import { initLineFocus, shutdownLineFocus } from "./modules/linefocus";
 
 async function onStartup() {
   await Promise.all([
@@ -16,9 +17,9 @@ async function onStartup() {
 
   initLocale();
 
-  initLineFocus();
+  await registerPreferencePane();
 
-  BasicExampleFactory.registerPrefs();
+  initLineFocus();
 
   await Promise.all(
     Zotero.getMainWindows().map((win) => onMainWindowLoad(win)),
@@ -36,7 +37,6 @@ async function onMainWindowLoad(win: _ZoteroTypes.MainWindow): Promise<void> {
   win.MozXULElement.insertFTLIfNeeded(
     `${addon.data.config.addonRef}-mainWindow.ftl`,
   );
-
 }
 
 async function onMainWindowUnload(win: Window): Promise<void> {
@@ -45,6 +45,7 @@ async function onMainWindowUnload(win: Window): Promise<void> {
 }
 
 function onShutdown(): void {
+  shutdownLineFocus();
   ztoolkit.unregisterAll();
   addon.data.dialog?.window?.close();
   // Remove addon object

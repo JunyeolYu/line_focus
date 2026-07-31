@@ -15,7 +15,6 @@ export type FluentMessageId =
   | 'menupopup-label'
   | 'pref-color'
   | 'pref-help'
-  | 'pref-title'
   | 'prefs-table-detail'
   | 'prefs-table-title'
   | 'startup-begin'

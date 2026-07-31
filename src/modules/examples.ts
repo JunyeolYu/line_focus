@@ -66,14 +66,4 @@ export class BasicExampleFactory {
   private static unregisterNotifier(notifierID: string) {
     Zotero.Notifier.unregisterObserver(notifierID);
   }
-
-  @example
-  static registerPrefs() {
-    Zotero.PreferencePanes.register({
-      pluginID: addon.data.config.addonID,
-      src: rootURI + "content/preferences.xhtml",
-      label: "Line Focus",
-      image: `chrome://${addon.data.config.addonRef}/content/icons/favicon.png`,
-    });
-  }
 }
